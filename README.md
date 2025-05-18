@@ -26,6 +26,11 @@ xattr -c /Applications/Groq\ Desktop.app
 
 - Chat interface with image support
 - Local MCP servers
+- Persistent conversations with export
+- Conversation import
+- Search within messages
+- Voice input and text-to-speech
+- Message editing, branching and regeneration
 
 ## Prerequisites
 

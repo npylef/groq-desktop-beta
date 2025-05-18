@@ -65,7 +65,21 @@ const setToolApprovalStatus = (toolName, status) => {
 
 function App() {
   // const [messages, setMessages] = useState([]); // Remove local state
-  const { messages, setMessages } = useChat(); // Use context state
+  const {
+    conversationId,
+    messages,
+    setMessages,
+    conversations,
+    loadConversation,
+    createConversation,
+    importConversation,
+    branchConversation,
+    editMessage,
+    title,
+    setTitle,
+    searchQuery,
+    setSearchQuery,
+  } = useChat();
   const [loading, setLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('llama-3.3-70b-versatile');
   const [mcpTools, setMcpTools] = useState([]);
@@ -81,6 +95,7 @@ function App() {
   const [visionSupported, setVisionSupported] = useState(false);
   // Add state to track if initial model/settings load is complete
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem('tts_enabled') === 'true');
 
   // --- State for Tool Approval Flow ---
   const [pendingApprovalCall, setPendingApprovalCall] = useState(null); // Holds the tool call object needing approval
@@ -93,6 +108,15 @@ function App() {
       // Create a copy without the last message
       return prev.slice(0, prev.length - 1);
     });
+  };
+
+  const handleRegenerate = (index) => {
+    const base = messages.slice(0, index);
+    const lastUser = base[base.length - 1];
+    if (lastUser && lastUser.role === 'user') {
+      setMessages(base);
+      handleSendMessage(lastUser.content);
+    }
   };
   
   // Models list derived from capabilities keys
@@ -263,6 +287,23 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (!ttsEnabled) return;
+    const last = messages[messages.length - 1];
+    if (last && last.role === 'assistant') {
+      let text = '';
+      if (typeof last.content === 'string') {
+        text = last.content;
+      } else if (Array.isArray(last.content)) {
+        text = last.content.filter(p => p.type === 'text').map(p => p.text).join(' ');
+      }
+      if (text) {
+        const utter = new SpeechSynthesisUtterance(text);
+        speechSynthesis.speak(utter);
+      }
+    }
+  }, [messages, ttsEnabled]);
 
   const executeToolCall = async (toolCall) => {
     try {
@@ -819,7 +860,26 @@ function App() {
           <h1 className="text-2xl text-white">
             groq<span className="text-primary">desktop</span>
           </h1>
+          {title && (
+            <h2 className="text-lg text-gray-300 ml-4">{title}</h2>
+          )}
           <div className="flex items-center gap-4">
+            <div className="flex items-center mr-4">
+              <label htmlFor="conversation-select" className="mr-2 text-gray-300 font-medium">Conversation:</label>
+              <select
+                id="conversation-select"
+                value={conversationId || ''}
+                onChange={(e) => loadConversation(e.target.value)}
+                className="border border-gray-500 rounded-md text-white"
+              >
+                {conversations.map(c => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+              <button className="ml-2 btn btn-secondary" onClick={createConversation}>New</button>
+              <button className="ml-2 btn btn-secondary" onClick={() => window.electron.exportConversation(conversationId)}>Export</button>
+              <button className="ml-2 btn btn-secondary" onClick={importConversation}>Import</button>
+            </div>
             <div className="flex items-center">
               <label htmlFor="model-select" className="mr-3 text-gray-300 font-medium">Model:</label>
               <select
@@ -833,6 +893,18 @@ function App() {
                 ))}
               </select>
             </div>
+            <input
+              type="text"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="ml-4 border border-gray-500 rounded-md bg-transparent text-white px-2"
+            />
+            <button className="ml-2 btn btn-secondary" onClick={() => {
+              const val = !ttsEnabled; setTtsEnabled(val); localStorage.setItem('tts_enabled', String(val));
+            }}>
+              {ttsEnabled ? 'TTS On' : 'TTS Off'}
+            </button>
             <Link to="/settings" className="btn btn-primary">Settings</Link>
           </div>
         </div>
@@ -840,10 +912,21 @@ function App() {
       
       <main className="flex-1 overflow-hidden flex flex-col">
         <div className="flex-1 overflow-y-auto p-2">
-          <MessageList 
-            messages={messages} 
-            onToolCallExecute={executeToolCall} 
-            onRemoveLastMessage={handleRemoveLastMessage} 
+          <MessageList
+            messages={messages.filter(m => {
+              if (!searchQuery) return true;
+              const text = typeof m.content === 'string'
+                ? m.content
+                : Array.isArray(m.content)
+                  ? m.content.filter(p => p.type === 'text').map(p => p.text).join(' ')
+                  : '';
+              return text.toLowerCase().includes(searchQuery.toLowerCase());
+            })}
+            onToolCallExecute={executeToolCall}
+            onRemoveLastMessage={handleRemoveLastMessage}
+            onEditMessage={editMessage}
+            onBranchConversation={branchConversation}
+            onRegenerateMessage={handleRegenerate}
           />
           <div ref={messagesEndRef} />
         </div>

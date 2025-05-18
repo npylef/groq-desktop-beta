@@ -1,12 +1,30 @@
 import React, { useState } from 'react';
 import ToolCall from './ToolCall';
 
-function Message({ message, children, onToolCallExecute, allMessages, isLastMessage, onRemoveMessage }) {
+function Message({ message, children, onToolCallExecute, allMessages, isLastMessage, onRemoveMessage, onEdit, onBranch, onRegenerate, index }) {
   const { role, tool_calls, reasoning, isStreaming } = message;
   const [showReasoning, setShowReasoning] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
   const isUser = role === 'user';
   const hasReasoning = reasoning && !isUser;
   const isStreamingMessage = isStreaming === true;
+
+  const startEdit = () => {
+    let text = '';
+    if (typeof message.content === 'string') {
+      text = message.content;
+    } else if (Array.isArray(message.content)) {
+      text = message.content.filter(p => p.type === 'text').map(p => p.text).join('\n');
+    }
+    setEditText(text);
+    setEditing(true);
+  };
+
+  const saveEdit = () => {
+    if (onEdit) onEdit(editText);
+    setEditing(false);
+  };
 
   // Find tool results for this message's tool calls in the messages array
   const findToolResult = (toolCallId) => {
@@ -50,7 +68,21 @@ function Message({ message, children, onToolCallExecute, allMessages, isLastMess
           </div>
         )}
         <div className={wrapperClasses}>
-          {children}
+          {editing ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                className="w-full p-2 border border-gray-500 rounded-md text-black"
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <button className="btn btn-primary" onClick={saveEdit}>Save</button>
+                <button className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
         </div>
         
         {tool_calls && tool_calls.map((toolCall, index) => (
@@ -87,6 +119,13 @@ function Message({ message, children, onToolCallExecute, allMessages, isLastMess
             )}
           </div>
         )}
+        <div className="mt-1 flex gap-2 text-xs text-gray-400">
+          {onEdit && !editing && (
+            <button onClick={startEdit}>Edit</button>
+          )}
+          {onBranch && <button onClick={onBranch}>Branch</button>}
+          {onRegenerate && <button onClick={onRegenerate}>Regenerate</button>}
+        </div>
       </div>
     </div>
   );

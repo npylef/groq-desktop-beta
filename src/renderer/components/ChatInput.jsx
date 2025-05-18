@@ -6,6 +6,33 @@ function ChatInput({ onSendMessage, loading = false, visionSupported = false }) 
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null); // Ref for file input
   const prevLoadingRef = useRef(loading);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setMessage(prev => (prev ? prev + ' ' + transcript : transcript));
+      };
+      rec.onend = () => setListening(false);
+      recognitionRef.current = rec;
+    }
+  }, []);
+
+  const toggleMic = () => {
+    if (!recognitionRef.current) return;
+    if (listening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+      setListening(true);
+    }
+  };
 
   // Function to handle image selection
   const handleImageChange = (e) => {
@@ -190,6 +217,15 @@ function ChatInput({ onSendMessage, loading = false, visionSupported = false }) 
             disabled={loading}
           />
         </div>
+        <button
+          type="button"
+          className={`tools-button ${listening ? 'bg-primary/80' : ''}`}
+          onClick={toggleMic}
+          title="Voice input"
+          disabled={loading || !recognitionRef.current}
+        >
+          🎤
+        </button>
         {/* Send Button */}
         <button
           type="submit"

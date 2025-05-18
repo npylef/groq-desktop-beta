@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Message from './Message';
 import MarkdownRenderer from './MarkdownRenderer';
 
-function MessageList({ messages = [], onToolCallExecute, onRemoveLastMessage }) {
+function MessageList({ messages = [], onToolCallExecute, onRemoveLastMessage, onEditMessage, onBranchConversation, onRegenerateMessage }) {
   const [showRemoveButtonIndex, setShowRemoveButtonIndex] = useState(null);
   const [fullScreenImage, setFullScreenImage] = useState(null);
 
@@ -42,13 +42,17 @@ function MessageList({ messages = [], onToolCallExecute, onRemoveLastMessage }) 
   return (
     <div className="space-y-2 pt-4">
       {displayMessages.map((message, index) => (
-        <Message 
-          key={index} 
-          message={message} 
+        <Message
+          key={index}
+          message={message}
           onToolCallExecute={onToolCallExecute}
-          allMessages={messages} // Pass all messages for the Message component to find tool results
+          allMessages={messages}
+          index={index}
           isLastMessage={index === displayMessages.length - 1}
           onRemoveMessage={index === displayMessages.length - 1 ? onRemoveLastMessage : null}
+          onEdit={newContent => onEditMessage && onEditMessage(index, newContent)}
+          onBranch={() => onBranchConversation && onBranchConversation(index)}
+          onRegenerate={() => onRegenerateMessage && onRegenerateMessage(index)}
         >
           {message.role === 'user' ? (
             <div 

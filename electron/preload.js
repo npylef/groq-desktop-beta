@@ -77,5 +77,13 @@ contextBridge.exposeInMainWorld('electron', {
     return () => ipcRenderer.removeListener('mcp-auth-reconnect-complete', listener);
   },
 
+  // Chat history
+  listConversations: () => ipcRenderer.invoke('list-conversations'),
+  loadConversation: (id) => ipcRenderer.invoke('load-conversation', id),
+  saveConversation: (data) => ipcRenderer.invoke('save-conversation', data),
+  createConversation: () => ipcRenderer.invoke('create-conversation'),
+  exportConversation: (id) => ipcRenderer.invoke('export-conversation', id),
+  importConversation: () => ipcRenderer.invoke('import-conversation'),
+
   // Other?
-}); 
+});

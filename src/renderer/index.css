@@ -19,6 +19,10 @@ body {
   .btn-primary {
     @apply bg-primary text-white hover:bg-primary/90;
   }
+
+  .btn-secondary {
+    @apply bg-gray-700 text-white hover:bg-gray-600;
+  }
   
   .input {
     /* Apply dark border directly */
