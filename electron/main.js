@@ -19,7 +19,7 @@ const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 console.log('Groq Desktop started, logging to', logFile);
 
 // Import necessary Electron modules
-const { BrowserWindow, ipcMain, screen, shell } = require('electron');
+const { BrowserWindow, ipcMain, screen, shell, dialog } = require('electron');
 
 // Import shared models
 const { MODEL_CONTEXT_SIZES } = require('../shared/models.js');
@@ -27,6 +27,7 @@ const { MODEL_CONTEXT_SIZES } = require('../shared/models.js');
 // Import handlers
 const chatHandler = require('./chatHandler');
 const toolHandler = require('./toolHandler');
+const chatHistory = require('./chatHistory');
 
 // Import new manager modules
 const { initializeSettingsHandlers, loadSettings } = require('./settingsManager');
@@ -67,6 +68,8 @@ app.whenReady().then(async () => {
 
   // Initialize settings handlers (needs app)
   initializeSettingsHandlers(ipcMain, app);
+  // Initialize chat history storage
+  chatHistory.init(app);
 
   // Initialize MCP handlers (use module object)
   mcpManager.initializeMcpHandlers(ipcMain, app, mainWindow, loadSettings, resolveCommandPath);
@@ -113,6 +116,44 @@ app.whenReady().then(async () => {
           console.error(`[Main] Error handling start-mcp-auth-flow for ${serverId}:`, error);
           throw error;
       }
+  });
+
+  // --- Chat History IPC Handlers ---
+  ipcMain.handle('list-conversations', async () => {
+      return chatHistory.listConversations();
+  });
+  ipcMain.handle('load-conversation', async (_event, id) => {
+      return chatHistory.loadConversation(id);
+  });
+  ipcMain.handle('save-conversation', async (_event, data) => {
+      chatHistory.saveConversation(data.id, data.messages, data.title);
+      return true;
+  });
+  ipcMain.handle('create-conversation', async () => {
+      return chatHistory.createConversation();
+  });
+  ipcMain.handle('export-conversation', async (_event, id) => {
+      const conv = chatHistory.loadConversation(id);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+          defaultPath: `${id}.json`,
+          filters: [{ name: 'JSON', extensions: ['json'] }]
+      });
+      if (!canceled && filePath) {
+          fs.writeFileSync(filePath, JSON.stringify(conv, null, 2));
+          return true;
+      }
+      return false;
+  });
+  ipcMain.handle('import-conversation', async () => {
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+          properties: ['openFile']
+      });
+      if (!canceled && filePaths && filePaths[0]) {
+          const id = chatHistory.importConversation(filePaths[0]);
+          return id;
+      }
+      return null;
   });
 
   // --- Post-initialization Tasks --- //
